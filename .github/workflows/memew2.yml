@@ -1,0 +1,62 @@
+name: "Laravel Security Scan"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '35 7 * * 3' # Run every Wednesday at 07:35 UTC
+
+jobs:
+  security-scan:
+    name: Analyze PHP (Laravel)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Setup PHP environment
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2' # Adjust to your Laravel project's PHP version
+        extensions: mbstring, xml, bcmath, ctype, json, tokenizer, pdo_mysql
+        tools: composer:v2
+
+    # Install Composer dependencies
+    - name: Install Composer dependencies
+      run: composer install --prefer-dist --no-progress
+
+    # Install PHP Security Checker
+    - name: Install PHP Security Checker
+      run: |
+        wget https://github.com/fabpot/local-php-security-checker/releases/download/v2.0.6/local-php-security-checker_2.0.6_linux_amd64 -O local-php-security-checker
+        chmod +x local-php-security-checker
+
+    # Run PHP Security Checker
+    - name: Run PHP Security Checker
+      run: ./local-php-security-checker --path=composer.lock
+      continue-on-error: true # Continue even if vulnerabilities are found to report them
+
+    # Optional: Run PHPStan for static analysis (if desired)
+    - name: Run PHPStan
+      run: |
+        composer require --dev phpstan/phpstan
+        vendor/bin/phpstan analyse --memory-limit=2G
+      continue-on-error: true # Optional, for static analysis
+
+    # Upload security scan results (if needed)
+    - name: Upload security scan results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-scan-results
+        path: |
+          composer.lock
+          phpstan.neon
