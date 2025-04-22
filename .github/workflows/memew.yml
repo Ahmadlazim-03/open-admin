@@ -1,0 +1,56 @@
+name: "Laravel Security Scan with CodeQL and Dependabot"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '35 7 * * 3' # Jalankan setiap hari Rabu pukul 07:35 UTC
+
+jobs:
+  analyze:
+    name: Analyze PHP (Laravel)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'php' ]
+        # CodeQL mendukung 'php' untuk Laravel
+        # Build mode 'none' karena PHP tidak memerlukan kompilasi untuk analisis CodeQL
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Setup PHP environment untuk memastikan dependensi Laravel tersedia
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2' # Sesuaikan dengan versi PHP yang digunakan Laravel
+        extensions: mbstring, xml, bcmath, ctype, json, tokenizer, pdo_mysql
+        tools: composer:v2
+
+    # Instal dependensi Composer
+    - name: Install Composer dependencies
+      run: composer install --prefer-dist --no-progress
+
+    # Inisialisasi CodeQL untuk PHP
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        # Gunakan query keamanan tambahan untuk PHP
+        queries: +security-and-quality
+
+    # Analisis kode dengan CodeQL
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{ matrix.language }}"
